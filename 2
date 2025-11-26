@@ -1,0 +1,520 @@
+using System;
+using System.Collections.Generic;
+using System.Collections.Specialized;
+using System.ComponentModel;
+using System.IO;
+using System.Linq;
+using System.Text;
+using System.Threading;
+using System.Threading.Tasks;
+using System.Timers;
+
+namespace ConsoleApp5
+{
+    internal class Program
+    {
+        public class DataChangedEventArgs : EventArgs
+        {
+            public string PropertyName { get; set; }
+            public object OldValue { get; set; }
+            public object NewValue { get; set; }
+        }
+
+        public class ProgressEventArgs : EventArgs
+        {
+            public int ProgressPercentage { get; set; }
+            public string StatusMessage { get; set; }
+        }
+
+        public class OperationCompletedEventArgs : EventArgs
+        {
+            public bool Success { get; set; }
+            public string Message { get; set; }
+            public Exception Error { get; set; }
+        }
+
+        public delegate void DataChangedEventHandler(object sender, DataChangedEventArgs e);
+        public delegate void ProgressEventHandler(object sender, ProgressEventArgs e);
+        public delegate void OperationCompletedEventHandler(object sender, OperationCompletedEventArgs e);
+
+        public class Observable : INotifyPropertyChanged
+        {
+            public event PropertyChangedEventHandler PropertyChanged;
+
+            protected virtual void OnPropertyChanged(string propertyName)
+            {
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+            }
+        }
+
+        public class DataProcessor : Observable
+        {
+            private string _data;
+
+            public string Data
+            {
+                get => _data;
+                set
+                {
+                    if (_data != value)
+                    {
+                        var oldValue = _data;
+                        _data = value;
+                        OnPropertyChanged(nameof(Data));
+                        OnDataChanged(new DataChangedEventArgs
+                        {
+                            PropertyName = nameof(Data),
+                            OldValue = oldValue,
+                            NewValue = value
+                        });
+                    }
+                }
+            }
+
+            public event DataChangedEventHandler DataChanged;
+
+            protected virtual void OnDataChanged(DataChangedEventArgs e)
+            {
+                DataChanged?.Invoke(this, e);
+            }
+
+            public event EventHandler ProcessStarted;
+            public event EventHandler ProcessCompleted;
+
+            public void StartProcess()
+            {
+                ProcessStarted?.Invoke(this, EventArgs.Empty);
+                Thread.Sleep(1000);
+                ProcessCompleted?.Invoke(this, EventArgs.Empty);
+            }
+        }
+
+        public class NotificationSystem
+        {
+            public event EventHandler NotificationSent;
+
+            public void SendNotification(string message)
+            {
+                Console.WriteLine($"Уведомление: {message}");
+                NotificationSent?.Invoke(this, EventArgs.Empty);
+            }
+        }
+
+        public class EmailService
+        {
+            public event EventHandler EmailSent;
+
+            public void SendEmail(string to, string subject)
+            {
+                Console.WriteLine($"Отправка email для {to}: {subject}");
+                EmailSent?.Invoke(this, EventArgs.Empty);
+            }
+        }
+
+        public class Logger
+        {
+            public event EventHandler<string> LogEntryAdded;
+
+            public void Log(string message)
+            {
+                Console.WriteLine($"[LOG] {DateTime.Now}: {message}");
+                LogEntryAdded?.Invoke(this, message);
+            }
+        }
+
+        public class CustomTimer
+        {
+            private readonly System.Timers.Timer _timer;
+
+            public event EventHandler TimerElapsed;
+
+            public CustomTimer(int interval)
+            {
+                _timer = new System.Timers.Timer(interval);
+                _timer.Elapsed += OnTimerElapsed;
+            }
+
+            private void OnTimerElapsed(object sender, ElapsedEventArgs e)
+            {
+                TimerElapsed?.Invoke(this, EventArgs.Empty);
+            }
+
+            public void Start() => _timer.Start();
+            public void Stop() => _timer.Stop();
+        }
+
+        public class ObservableCollection<T> : INotifyCollectionChanged
+        {
+            private readonly List<T> _items = new List<T>();
+
+            public event NotifyCollectionChangedEventHandler CollectionChanged;
+
+            public void Add(T item)
+            {
+                _items.Add(item);
+                CollectionChanged?.Invoke(this,
+                    new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Add, item));
+            }
+
+            public void Remove(T item)
+            {
+                if (_items.Remove(item))
+                {
+                    CollectionChanged?.Invoke(this,
+                        new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Remove, item));
+                }
+            }
+        }
+
+        public class FileWatcher
+        {
+            private readonly FileSystemWatcher _watcher;
+
+            public event EventHandler<string> FileChanged;
+
+            public FileWatcher(string path)
+            {
+                _watcher = new FileSystemWatcher(path);
+                _watcher.Changed += (s, e) => FileChanged?.Invoke(this, e.FullPath);
+                _watcher.EnableRaisingEvents = true;
+            }
+        }
+
+        public class ProgressReporter
+        {
+            public event ProgressEventHandler ProgressChanged;
+
+            public void ReportProgress(int percentage, string message)
+            {
+                ProgressChanged?.Invoke(this, new ProgressEventArgs
+                {
+                    ProgressPercentage = percentage,
+                    StatusMessage = message
+                });
+            }
+        }
+
+        public class AsyncOperation
+        {
+            public event OperationCompletedEventHandler OperationCompleted;
+
+            public async Task ExecuteAsync()
+            {
+                try
+                {
+                    await Task.Delay(1000);
+                    OperationCompleted?.Invoke(this, new OperationCompletedEventArgs
+                    {
+                        Success = true,
+                        Message = "Операция завершена успешно"
+                    });
+                }
+                catch (Exception ex)
+                {
+                    OperationCompleted?.Invoke(this, new OperationCompletedEventArgs
+                    {
+                        Success = false,
+                        Error = ex,
+                        Message = "Ошибка при выполнении операции"
+                    });
+                }
+            }
+        }
+
+        public class ApplicationStateManager
+        {
+            public event EventHandler<string> StateChanged;
+
+            private string _currentState;
+
+            public string CurrentState
+            {
+                get => _currentState;
+                set
+                {
+                    _currentState = value;
+                    StateChanged?.Invoke(this, value);
+                }
+            }
+        }
+
+        public class NetworkMonitor
+        {
+            public event EventHandler<bool> ConnectionStatusChanged;
+
+            public void SimulateConnectionChange()
+            {
+                ConnectionStatusChanged?.Invoke(this, true);
+                Thread.Sleep(500);
+                ConnectionStatusChanged?.Invoke(this, false);
+            }
+        }
+
+        public class CustomControl
+        {
+            public event EventHandler Click;
+
+            public void SimulateClick()
+            {
+                Click?.Invoke(this, EventArgs.Empty);
+            }
+        }
+
+        public class KeyboardInputHandler
+        {
+            public event EventHandler<ConsoleKeyInfo> KeyPressed;
+
+            public void StartListening()
+            {
+                Task.Run(() =>
+                {
+                    while (true)
+                    {
+                        var key = Console.ReadKey(true);
+                        KeyPressed?.Invoke(this, key);
+                    }
+                });
+            }
+        }
+
+        public class DataValidator
+        {
+            public event EventHandler<bool> ValidationCompleted;
+
+            public void Validate(string data)
+            {
+                bool isValid = !string.IsNullOrEmpty(data);
+                ValidationCompleted?.Invoke(this, isValid);
+            }
+        }
+
+        class Program
+        {
+            static void Main(string[] args)
+            {
+                while (true)
+                {
+                    Console.Clear();
+                    Console.WriteLine("=== ДЕМОНСТРАЦИЯ РАБОТЫ С СОБЫТИЯМИ ===");
+                    Console.WriteLine("Выберите задание (1-50) или 0 для выхода:");
+
+                    if (int.TryParse(Console.ReadLine(), out int choice))
+                    {
+                        if (choice == 0) break;
+
+                        ExecuteTask(choice);
+                        Console.WriteLine("\nНажмите любую клавишу для продолжения...");
+                        Console.ReadKey();
+                    }
+                }
+            }
+
+            static void ExecuteTask(int taskNumber)
+            {
+                Console.WriteLine($"\n--- Задание {taskNumber} ---");
+
+                switch (taskNumber)
+                {
+                    case 1:
+                        var notifier = new NotificationSystem();
+                        notifier.NotificationSent += (s, e) => Console.WriteLine("Событие NotificationSent сработало!");
+                        notifier.SendNotification("Тестовое уведомление");
+                        break;
+
+                    case 2:
+                        var processor = new DataProcessor();
+                        processor.DataChanged += (s, e) =>
+                            Console.WriteLine($"Данные изменены: {e.PropertyName} с {e.OldValue} на {e.NewValue}");
+                        processor.Data = "Новое значение";
+                        break;
+
+                    case 3:
+                        var progressReporter = new ProgressReporter();
+                        progressReporter.ProgressChanged += (s, e) =>
+                            Console.WriteLine($"Прогресс: {e.ProgressPercentage}% - {e.StatusMessage}");
+                        progressReporter.ReportProgress(50, "Половина работы выполнена");
+                        break;
+
+                    case 4:
+                        var logger = new Logger();
+                        void LogHandler(object s, string msg) => Console.WriteLine($"Обработчик: {msg}");
+
+                        logger.LogEntryAdded += LogHandler;
+                        logger.Log("Первое сообщение");
+
+                        logger.LogEntryAdded -= LogHandler;
+                        logger.Log("Второе сообщение (не должно быть обработано)");
+                        break;
+
+                    case 5:
+                        var observable = new DataProcessor();
+                        observable.PropertyChanged += (s, e) =>
+                            Console.WriteLine($"Свойство {e.PropertyName} изменено");
+                        observable.Data = "Новое значение";
+                        break;
+
+                    case 6:
+                        var operation = new AsyncOperation();
+                        operation.OperationCompleted += (s, e) =>
+                            Console.WriteLine($"Операция завершена: {e.Success}, Сообщение: {e.Message}");
+                        operation.ExecuteAsync().Wait();
+                        break;
+
+                    case 7:
+                        var notificationSystem = new NotificationSystem();
+                        var emailService = new EmailService();
+
+                        notificationSystem.NotificationSent += (s, e) =>
+                            emailService.SendEmail("user@example.com", "Уведомление");
+
+                        notificationSystem.SendNotification("Важное сообщение");
+                        break;
+
+                    case 8:
+                        var button = new CustomControl();
+                        button.Click += (s, e) =>
+                            Console.WriteLine($"Кнопка нажата в {DateTime.Now}");
+                        button.SimulateClick();
+                        break;
+
+                    case 9:
+                        var emailer = new EmailService();
+                        emailer.EmailSent += (s, e) =>
+                            Console.WriteLine("Email отправлен успешно");
+                        emailer.SendEmail("test@example.com", "Тема письма");
+                        break;
+
+                    case 10:
+                        var multiHandler = new NotificationSystem();
+                        multiHandler.NotificationSent += (s, e) => Console.WriteLine("Обработчик 1");
+                        multiHandler.NotificationSent += (s, e) => Console.WriteLine("Обработчик 2");
+                        multiHandler.NotificationSent += (s, e) => Console.WriteLine("Обработчик 3");
+                        multiHandler.SendNotification("Цепочка обработчиков");
+                        break;
+
+                    case 11:
+                        var operationLogger = new Logger();
+                        operationLogger.LogEntryAdded += (s, msg) =>
+                            Console.WriteLine($"Запись в лог: {msg}");
+                        operationLogger.Log("Операция выполнена");
+                        break;
+
+                    case 12:
+                        var errorProneOperation = new AsyncOperation();
+                        errorProneOperation.OperationCompleted += (s, e) =>
+                        {
+                            if (!e.Success)
+                                Console.WriteLine($"Ошибка: {e.Error?.Message}");
+                            else
+                                Console.WriteLine("Успех!");
+                        };
+                        errorProneOperation.ExecuteAsync().Wait();
+                        break;
+
+                    case 13:
+                        var timer = new CustomTimer(1000);
+                        int counter = 0;
+                        timer.TimerElapsed += (s, e) =>
+                        {
+                            counter++;
+                            Console.WriteLine($"Таймер сработал {counter} раз");
+                            if (counter >= 3) timer.Stop();
+                        };
+                        timer.Start();
+                        Thread.Sleep(3500);
+                        break;
+
+                    case 14:
+                        var syncSource = new DataProcessor();
+                        var syncTarget = new DataProcessor();
+
+                        syncSource.DataChanged += (s, e) =>
+                        {
+                            syncTarget.Data = e.NewValue?.ToString();
+                            Console.WriteLine($"Данные синхронизированы: {e.NewValue}");
+                        };
+
+                        syncSource.Data = "Синхронизированные данные";
+                        break;
+
+                    case 15:
+                        var process = new DataProcessor();
+                        process.ProcessStarted += (s, e) => Console.WriteLine("Процесс начался");
+                        process.ProcessCompleted += (s, e) => Console.WriteLine("Процесс завершен");
+                        process.StartProcess();
+                        break;
+
+                    case 16:
+                        var stateManager = new ApplicationStateManager();
+                        stateManager.StateChanged += (s, state) =>
+                            Console.WriteLine($"Состояние приложения изменено на: {state}");
+                        stateManager.CurrentState = "Running";
+                        break;
+
+                    case 17:
+                        var uiUpdater = new ProgressReporter();
+                        uiUpdater.ProgressChanged += (s, e) =>
+                            Console.WriteLine($"UI обновлен: {e.ProgressPercentage}% - {e.StatusMessage}");
+                        uiUpdater.ReportProgress(75, "Обновление интерфейса");
+                        break;
+
+                    case 18:
+                        var collection = new ObservableCollection<string>();
+                        collection.CollectionChanged += (s, e) =>
+                        {
+                            Console.WriteLine($"Коллекция изменена: {e.Action}");
+                            if (e.NewItems != null)
+                                foreach (var item in e.NewItems)
+                                    Console.WriteLine($"Добавлен: {item}");
+                        };
+                        collection.Add("Элемент 1");
+                        collection.Add("Элемент 2");
+                        break;
+
+                    case 19:
+                        var inputHandler = new KeyboardInputHandler();
+                        inputHandler.KeyPressed += (s, e) =>
+                            Console.WriteLine($"Нажата клавиша: {e.Key}");
+                        Console.WriteLine("Нажмите любую клавишу (выход - Escape):");
+
+                        var key = Console.ReadKey(true);
+                        Console.WriteLine($"Вы нажали: {key.Key}");
+                        break;
+
+                    case 20:
+                        var dbOperation = new AsyncOperation();
+                        dbOperation.OperationCompleted += (s, e) =>
+                            Console.WriteLine($"Операция с БД: {e.Message}");
+                        dbOperation.ExecuteAsync().Wait();
+                        break;
+
+                    case 41:
+                        var asyncOp = new AsyncOperation();
+                        asyncOp.OperationCompleted += (s, e) =>
+                            Console.WriteLine($"Асинхронная операция завершена: {e.Success}");
+                        Console.WriteLine("Запуск асинхронной операции...");
+                        asyncOp.ExecuteAsync().Wait();
+                        break;
+
+                    case 50:
+                        var lifecycleManager = new ApplicationStateManager();
+                        string[] phases = { "Загрузка", "Инициализация", "Выполнение", "Завершение" };
+
+                        lifecycleManager.StateChanged += (s, phase) =>
+                            Console.WriteLine($"Фаза жизненного цикла: {phase}");
+
+                        foreach (var phase in phases)
+                        {
+                            lifecycleManager.CurrentState = phase;
+                            Thread.Sleep(500);
+                        }
+                        break;
+
+                    default:
+                        Console.WriteLine($"Задание {taskNumber} еще не реализовано");
+                        break;
+                }
+            }
+        }
+    }
+}
